@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera & Reading Barcode Test with Google Vision API</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        .success {
+            color: green;
+        }
+        .failure {
+            color: red;
+        }
+        .face_image {
+            width: 96px;
+        }
+        .container {
+            text-align: center;
+            margin: auto;
+        }
+        .btn-area {
+            margin: 0.5rem 0;
+        }
+        .camera-area {
+            background-color: #ffeeee;
+            min-height: 10rem;
+        }
+        #camera_shoot {
+            min-height: 8rem;
+        }
+        #barcode-result {
+            background-color: #eedddd;
+            height: 2rem;
+        }
+        .amazon-link {
+            background-color: lightgreen; /* テキストをグレーに */
+            min-height: 10rem;
+        }
+        .pmda-link {
+            background-color: lightblue; /* テキストをグレーに */
+            min-height: 10rem;
+        }
+        #goto_amazon.disabled-link,
+        #goto_pmda.disabled-link {
+            color: grey; /* テキストをグレーに */
+            pointer-events: none; /* クリックを無効に */
+            opacity: 0.5; /* 半透明にして無効な見た目に */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <form id="upload-form" style="display: none;">
+            <input type="file" accept="image/*" capture="camera" id="camera-input" name="image">
+        </form>
+        <div class="camera-area">
+            <div id="camera_shoot">
+                <div style="margin: auto;">
+                    <i class="fa-solid fa-camera"></i>ここをタップして、モバイル端末のカメラでバーコードの写真を撮ってください。PCからは写真を指定できます。
+                </div>
+            </div>
+            <!-- バーコードの読み取り結果を表示するためのスペース -->
+            <div id="barcode-result"></div>
+            <div id="qrcode-result"></div>
+        </div>
+        <div id="goto_amazon" class="btn-area amazon-link disabled-link">
+            <div class="">Amazonでバーコード検索する。</div>
+            <div id="amazon_url" class=""></div>
+        </div>
+        <div id="goto_pmda" class="btn-area pmda-link disabled-link">
+            <div class="">PMDAでGS1-128を検索する。</div>
+            <div id="pmda_url" class=""></div>
+        </div>
+    </div>
+
+    {% include 'parts/common_scripts.html' %}
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js" integrity="sha384-fbbOQedDUMZZ5KreZpsbe1LCZPVmfTnH7ois6mU1QK+m14rQ1l2bGBq41eYeM/fS" crossorigin="anonymous"></script>
+    <script>
+        function readBarcode(imageFile) {
+            console.log("readBarcode 1");
+            // FormDataオブジェクトを作成
+            var formData = new FormData();
+            // 'file'というキーでimageFileを追加
+            formData.append('image-file', imageFile);
+            console.log("readBarcode 2");
+
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    url: REMOTE_URL + '/read-barcode',
+                    type: 'POST',
+                    data: formData,
+                    processData: false, // jQueryがdataを処理しないようにする
+                    contentType: false, // jQueryがcontentTypeを設定しないようにする
+                    headers: {
+                        'X-Chat-Url': window.location.href
+                    },
+                    dataType: 'json',
+                    beforeSend: function() {
+                        // リクエスト開始時にローディングアイコンを表示
+                        // showLoadingIcon();
+                    },
+                    success: function(response) {
+                        console.log("readBarcode 3");
+                        // alert(response.barcodes);
+                        document.getElementById('barcode-result').textContent = response.barcodes;
+                        console.log("readBarcode 4");
+                        resolve(response); // バーコードが読み取れたらresolve
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('Error', textStatus, errorThrown);
+                        if (jqXHR.responseJSON) {
+    //                        showWarningMessage(jqXHR.status + ': ' + jqXHR.responseJSON.error.message, 20000);
+                            // alert(jqXHR.status + ': ' + jqXHR.responseJSON.error.message);
+                        }
+                        document.getElementById('qrcode-result').textContent = "バーコードの読み取りに失敗しました。";
+                        reject("バーコードの読み取りに失敗しました。");
+                    },
+                    complete: function(jqXHR, textStatus) {
+                        // 処理完了後にローディングアイコンを非表示にする
+                        // hideLoadingIcon();
+                    }
+                });
+            });
+        }
+
+        async function decodeBarcodeByVisionApi(imageFile) {
+            var result = false;
+            try {
+                const barcodeResult = await readBarcode(imageFile);
+                // バーコードの読み取り成功時の処理
+                console.log('バーコード読み取り成功', barcodeResult);
+                result = true;
+            } catch (error) {
+                // バーコードの読み取りが失敗した場合
+                // pass
+            }
+            return result;
+        }
+
+        document.getElementById('camera-input').addEventListener('change', async function(e) {
+            if (e.target.files && e.target.files.length) {
+                var file = e.target.files[0]; // 選択されたファイルを取得
+                console.log("before: decodeBarcodeByVisionApi(file)");
+                var result = await decodeBarcodeByVisionApi(file); // ファイルを関数に渡す
+                console.log("after : decodeBarcodeByVisionApi(file)");
+
+                if (result) {
+                    // 成功した処理...
+                    if (navigator.vibrate && typeof navigator.vibrate === 'function') {
+                        navigator.vibrate(400);
+                    }
+                } else {
+                    console.log("失敗しました。2");
+                }
+            } else {
+                console.log("失敗しました。");
+            }
+        });
+
+        $(document).ready(function() {
+            $('#camera_shoot').click(function() {
+                document.getElementById('camera-input').click(); // 隠れたinputをクリック
+            });
+            // $('#goto_amazon').click(function() {
+            //     var url = $('#amazon_url').text();
+            //     if (url !== '') {
+            //         window.open(url, '_blank'); // 新しいタブでリンクを開く
+            //     }
+            // });
+            // $('#goto_pmda').click(function() {
+            //     var url = $('#pmda_url').text();
+            //     if (url !== '') {
+            //         window.open(url, '_blank'); // 新しいタブでリンクを開く
+            //     }
+            // });
+        });
+    </script>
+</body>
+</html>

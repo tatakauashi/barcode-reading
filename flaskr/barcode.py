@@ -1,34 +1,45 @@
+from . import app
 from google.cloud import vision
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+import logging, os, json
 
-app = Flask(__name__)
+@app.route('/', methods=['GET'])
+def index():
+    return render_template(
+        'barcodetest_gv.html'
+    )
 
 @app.route('/read-barcode', methods=['POST'])
 def read_barcode():
-  # 画像データを受け取る
-  image_data = request.files['image']
+    app_logger = logging.getLogger('app_logger')
 
-  # Vision API クライアントを作成
-  client = vision.ImageAnnotatorClient()
+    # 画像データを受け取る
+    image_data = request.files['image-file']
 
-  # 画像を Vision API に送信
-  image = vision.Image(content=image_data.read())
-  response = client.text_detection(image=image)
+    # Vision API クライアントを作成
+    client = vision.ImageAnnotatorClient()
 
-  # バーコード情報リスト
-  barcodes = []
+    # 画像を Vision API に送信
+    image = vision.Image(content=image_data.read())
+    response = client.text_detection(image=image)
+    # response = client.document_text_detection(image=image)
+    app_logger.info(f'response=[{response}]')
 
-  # 認識されたテキストを取得
-  for text_annotation in response.text_annotations:
-    # バーコードかどうか確認
-    if text_annotation.description.startswith('Barcode:'):
-      # バーコード内容を取得
-      barcode_value = text_annotation.description[8:]
-      # バーコード情報に追加
-      barcodes.append(barcode_value)
+    # バーコード情報リスト
+    barcodes = []
 
-  # 結果をJSON形式で返す
-  return jsonify({'barcodes': barcodes})
+    # 認識されたテキストを取得
+    for page in response.full_text_annotation.pages:
+        for block in page.blocks:
+            # バーコードかどうか確認
+            if block.block_type == 'BARCODE':
+                # data = {}
+                # data['format'] = barcode.format
+                # data['raw_value'] = barcode.raw_value
+                barcodes.append(block)
 
-# if __name__ == '__main__':
-#   app.run(debug=True)
+    # 結果をJSON形式で返す
+    if len(barcodes) > 0:
+        return jsonify({'barcodes': barcodes}), 200
+    else:
+        return jsonify({'barcodes': barcodes}), 500
