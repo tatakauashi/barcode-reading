@@ -1,0 +1,15 @@
+
+*.db
+*.pyc
+venv*
+flaskr/static/faces/*
+.DS_Store
+work
+flask_session
+*.mo
+logs
+start_*.bat
+start_*.ps1
+start_*.sh
+flaskapp.wsgi
+sandbox/output/*

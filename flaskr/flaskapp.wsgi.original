@@ -1,0 +1,11 @@
+import sys
+sys.path.insert(0, '/var/www/progs/barcode-reading')
+
+import os
+
+os.environ['FLASK_APP'] = 'flaskr'
+os.environ['FLASK_ENV'] = 'production'
+os.environ['GOOGLE_VISION_API_KEY'] = '<API Key of Google Vision API>'
+os.environ['REMOTE_URL'] = '/barcode-reading'
+
+from flaskr import app as application
