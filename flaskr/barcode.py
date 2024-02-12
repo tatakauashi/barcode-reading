@@ -42,4 +42,4 @@ def read_barcode():
     if len(barcodes) > 0:
         return jsonify({'barcodes': barcodes}), 200
     else:
-        return jsonify({'barcodes': barcodes}), 500
+        return jsonify({'message': 'No barcodes found'}), 404
